@@ -6,17 +6,17 @@ from openpyxl.utils import get_column_letter
 import math
 import os
 import warnings
-warnings.simplefilter(action="ignore",category=FutureWarning)
+warnings.simplefilter(action="ignore", category=FutureWarning)
 
-# ───────────────────────── PALETA DE COLORES ──────────────────────────────
-COLOR_HEADER = "8DB4E2"  # fondo encabezado
-COLOR_HEADER_FONT = "000000"  # texto encabezado
-COLOR_SECTION = "DAEEF3"  # filas “padre”/sección
-COLOR_ZEBRA = "F7F7F7"  # separadores zebra
-COLOR_HIGHLIGHT = "FFC000"  # resalte de diferencias
+# ───────────────────────── COLOR PALETTE ──────────────────────────────
+COLOR_HEADER = "8DB4E2"  # header background
+COLOR_HEADER_FONT = "000000"  # header text color
+COLOR_SECTION = "DAEEF3"  # parent/section row
+COLOR_ZEBRA = "F7F7F7"  # zebra separator
+COLOR_HIGHLIGHT = "FFC000"  # highlight differences
 
-MAX_COL_WIDTH = 120  # Ajusta ancho máximo
-PADDING = 2  # Espacio extra para columnas
+MAX_COL_WIDTH = 120  # maximum column width when adjusting
+PADDING = 2  # column padding
 
 
 # --------------------- Adjust Columns -----------------------------------------
@@ -45,18 +45,18 @@ def combine_and_format(
         sheet: str = "metrics"
 
 ):
-    # --- 2.1) read and tag columns ---
+    # --- 2.1) Read and tag columns ---
     df1 = pd.read_excel(input1, sheet_name=sheet, header=1)
     df2 = pd.read_excel(input2, sheet_name=sheet, header=1)
     keep_columns = ["Label", "#Samples", "FAIL", "Error %", "Average", "90th pct"]
-    df1=df1[keep_columns]
-    df2=df2[keep_columns]
+    df1 = df1[keep_columns]
+    df2 = df2[keep_columns]
 
 
-    df1_pref = df1.rename(columns={c: f"{input1.split(".")[0]}\n{c}" for c in df1.columns if c != "Label"})
-    df2_pref = df2.rename(columns={c: f"{input2.split(".")[0]}\n{c}" for c in df2.columns if c != "Label"})
+    df1_pref = df1.rename(columns={c: f"{input1.split('.')[0]}\n{c}" for c in df1.columns if c != "Label"})
+    df2_pref = df2.rename(columns={c: f"{input2.split('.')[0]}\n{c}" for c in df2.columns if c != "Label"})
 
-    # --- 2.2) Cruces de labels ---
+    # --- 2.2) Find common, only in 1 and only in 2 ---
     s1 = set(df1["Label"].dropna().astype(str).str.strip())
     s2 = set(df2["Label"].dropna().astype(str).str.strip())
     only1, only2 = s1 - s2, s2 - s1
@@ -65,7 +65,7 @@ def combine_and_format(
     df_o1 = df1_pref[df1_pref["Label"].isin(only1)].copy()
     df_o2 = df2_pref[df2_pref["Label"].isin(only2)].copy()
 
-    # completa columnas faltantes
+    # complete columns that may be missing after the merge
     for c in df2_pref.columns:
         if c != "Label" and c not in df_o1:
             df_o1[c] = pd.NA
@@ -80,14 +80,14 @@ def combine_and_format(
         .reset_index(drop=True)
     )
 
-    # --- 2.3) Reordenar columnas ---
+    # --- 2.3) Re‑order columns ---
     base = [c for c in df1.columns if c != "Label"]
     cols = ["Label"]
     for m in base:
-        cols += [f"{input1.split(".")[0]}\n{m}", f"{input2.split(".")[0]}\n{m}"]
+        cols += [f"{input1.split('.')[0]}\n{m}", f"{input2.split('.')[0]}\n{m}"]
     combined = combined[cols]
 
-    # ── 2.4) REDONDEO A DOS DECIMALES ────────────────────────────────────────
+    # ── 2.4) Round numeric columns to 2 decimals ─────────────────────────────
     numeric_cols = combined.select_dtypes(include="number").columns
 
     def fmt_num(x):
@@ -99,19 +99,19 @@ def combine_and_format(
 
     combined[numeric_cols] = combined[numeric_cols].applymap(fmt_num)
 
-    # --- 2.5) Exportar a Excel ---
+    # --- 2.5) Export to Excel ---
     combined.to_excel(output, sheet_name=sheet, index=False)
 
-    # --- 2.6) Formateo con openpyxl ---
+    # --- 2.6) openpyxl formatting ---
     wb = load_workbook(output)
     ws = wb[sheet]
 
-    # Estilos básicos
+    # basic styles
     header_fill = PatternFill("solid", fgColor=COLOR_HEADER)
     thin = Side("thin", color="000000")
     border = Border(thin, thin, thin, thin)
 
-    # Cabeceras con fuente blanca
+    # Headers with white font
     for col_idx in range(1, len(cols) + 1):
         cell = ws.cell(row=1, column=col_idx)
         cell.alignment = Alignment(wrap_text=True, horizontal="center", vertical="center")
@@ -119,7 +119,7 @@ def combine_and_format(
         cell.font = Font(color=COLOR_HEADER_FONT, bold=True)
         cell.border = border
 
-    # Bordes y número de dos decimales en columnas numéricas
+    # Borders and two‑decimal number format in numeric columns
     num_format_cols = {
         col_idx
         for col_idx, col_name in enumerate(cols, start=1)
@@ -131,15 +131,15 @@ def combine_and_format(
             if cell.column in num_format_cols and isinstance(cell.value, (int, float)):
                 cell.number_format = "0.00"
 
-    # 7.2) Resaltar diferencias significativas en ámbar
+    # 7.2) Highlight significant differences in amber
     highlight_fill = PatternFill("solid", fgColor=COLOR_HIGHLIGHT)
     col_map = {cell.value: idx for idx, cell in enumerate(ws[1], start=1)}
-    error1_col = col_map.get(f"{input1.split(".")[0]}\nError %")
-    error2_col = col_map.get(f"{input2.split(".")[0]}\nError %")
-    avg1_col = col_map.get(f"{input1.split(".")[0]}\nAverage")
-    avg2_col = col_map.get(f"{input2.split(".")[0]}\nAverage")
-    p90th1_col=col_map.get(f"{input1.split(".")[0]}\n90th pct")
-    p90th2_col=col_map.get(f"{input2.split(".")[0]}\n90th pct")
+    error1_col = col_map.get(f"{input1.split('.')[0]}\nError %")
+    error2_col = col_map.get(f"{input2.split('.')[0]}\nError %")
+    avg1_col = col_map.get(f"{input1.split('.')[0]}\nAverage")
+    avg2_col = col_map.get(f"{input2.split('.')[0]}\nAverage")
+    p90th1_col = col_map.get(f"{input1.split('.')[0]}\n90th pct")
+    p90th2_col = col_map.get(f"{input2.split('.')[0]}\n90th pct")
 
     for row in range(2, ws.max_row + 1):
         try:
@@ -174,9 +174,9 @@ def combine_and_format(
                     ws.cell(row=row, column=p90th2_col).fill = PatternFill(fill_type="solid", fgColor="90EE90")
 
         except Exception as e:
-            print(f"⚠️ Error comparando fila {row}: {e}")
+            print(f"⚠️ Error comparing row {row}: {e}")
 
-    # 7.3) Insertar filas separadoras (zebra)
+    # 7.3) Insert separator rows (zebra)
     zebra_fill = PatternFill("solid", fgColor=COLOR_ZEBRA)
     group_rows = []
     last_prefix = None
@@ -193,7 +193,7 @@ def combine_and_format(
         for c in range(1, len(cols) + 1):
             ws.cell(idx, c).fill = zebra_fill
 
-    # 7.4) Agrupación automática (filas padre)
+    # 7.4) Automatic grouping (parent rows)
     summary_fill = PatternFill("solid", fgColor=COLOR_SECTION)
     current_summary = None
     for r in range(2, ws.max_row + 1):
@@ -214,10 +214,10 @@ def combine_and_format(
     ws.sheet_properties.outlinePr.summaryBelow = False
     ws.freeze_panes = "A2"
 
-    # 7.5) Auto-ajustar columnas y guardar
+    # 7.5) Auto‑fit columns and save
     fit_columns(ws)
     wb.save(output)
-    print(f"✅ {output} creado y formateado.")
+    print(f"✅ {output} created and formatted.")
 
 
 # ───────────────────────── 3) MAIN ────────────────────────────────────────────
@@ -225,39 +225,38 @@ def combine_and_format(
 
 def compareReports():
     while True:
-        file1=input('Insert the first report for comparison: ')
-        if  not os.path.exists(file1):
-            print("the file did not exist. Make sure you are including the extension of the file ")
+        file1 = input('Insert the first report for comparison: ')
+        if not os.path.exists(file1):
+            print("The file does not exist. Make sure you include the file extension.")
             continue
         break
     while True:
-        file2=input('Insert the second report for comparison: ')
-        if  not os.path.exists(file2):
-            print("the file did not exist. Make sure you are including the extension of the file ")
+        file2 = input('Insert the second report for comparison: ')
+        if not os.path.exists(file2):
+            print("The file does not exist. Make sure you include the file extension.")
             continue
         break
     while True:
         try:
-            error_diff_thresholds=float(input('Max allowed difference in Error Rate (%): ').strip())
+            error_diff_thresholds = float(input('Max allowed difference in Error Rate (%): ').strip())
         except:
-            print("Just Float value is allowed. ")
+            print("Only float values are allowed.")
+            continue
         break
     while True:
         try:
-            avg_diff_thresholds=int(input('Max allowed difference in Avg Response Time (ms): ').strip())
+            avg_diff_thresholds = int(input('Max allowed difference in Avg Response Time (ms): ').strip())
         except:
-            print("Just Integer value is allowed. ")
+            print("Only integer values are allowed.")
+            continue
         break
     while True:
         try:
-            percentile_diff_thresholds=int(input('Max allowed difference in 90th Percentile (ms): ').strip())
+            percentile_diff_thresholds = int(input('Max allowed difference in 90th Percentile (ms): ').strip())
         except:
-            print("Just Integer value is allowed. ")
+            print("Only integer values are allowed.")
+            continue
         break
-
-
-
-
 
     combine_and_format(
         input1=file1,
@@ -267,8 +266,6 @@ def compareReports():
         error_diff_thresholds=error_diff_thresholds,
         avg_diff_thresholds=avg_diff_thresholds,
         percentile_diff_thresholds=percentile_diff_thresholds
-
-
     )
 
 

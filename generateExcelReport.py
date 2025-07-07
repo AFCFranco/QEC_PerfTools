@@ -12,12 +12,8 @@ from openpyxl.chart import LineChart, Reference
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import Alignment
 from time import sleep
-import xml.etree.ElementTree as ET
-import time
-import re
 from colorama import Fore, Style
-import os
-import colorama
+
 
 
 MAX_COL_WIDTH = 120  # Approx. pixels (tweak as needed)
@@ -286,9 +282,7 @@ def genarateExcelreport():
                 ws_metrics.row_dimensions[row_num].hidden = True
                 ws_metrics.row_dimensions[row_num].collapsed = True
 
-    # ============================================================
-    # 6. Insert the Errors table underneath "metrics"
-    # ============================================================
+
     # ============================================================
     # 6. Insert the Errors table in a new sheet called "errors"
     # ============================================================
