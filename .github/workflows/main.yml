@@ -1,9 +1,0 @@
-name: hellow-world
-on: push
-jobs: 
-  hello-word-job:
-    runs-on: ubuntu-latest
-    steps:
-      - name: check out repository
-        uses: actions/checkout@v4
-      - run: echo "$(cat hellow_word.txt)"
